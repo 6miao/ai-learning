@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>计划生成器（问卷→反馈→计划）</title>
+<style>
+  :root{
+    --head:#1F4E79; --head-bg:#D9E2F3; --accent:#2E75B6;
+    --line:#C2C9D6; --text:#222; --soft:#F5F8FC; --zebra:#F4F7FB; --muted:#6B7280;
+  }
+  body[data-theme="green"]{ --head:#2E7D32; --head-bg:#E0F0E1; --accent:#388E3C; --line:#BFD8C2; --soft:#F1F8F2; --zebra:#F4FAF4; }
+  body[data-theme="orange"]{ --head:#C05621; --head-bg:#FBE9DD; --accent:#E8743B; --line:#ECC9B4; --soft:#FDF3EC; --zebra:#FDF6F1; }
+  body[data-theme="gray"]{ --head:#4A4A4A; --head-bg:#ECECEC; --accent:#6B6B6B; --line:#CFCFCF; --soft:#F5F5F5; --zebra:#F7F7F7; }
+
+  *{box-sizing:border-box}
+  body{font-family:"Microsoft YaHei","微软雅黑",-apple-system,"PingFang SC",sans-serif;
+       color:var(--text); max-width:980px; margin:0 auto; padding:0 22px 60px; line-height:1.65;
+       background:#fff; transition:background .15s}
+  /* 顶部栏 */
+  .topbar{position:sticky; top:0; z-index:20; background:var(--head); color:#fff;
+          margin:0 -22px 0; padding:12px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap}
+  .brand{font-size:18px; font-weight:700; letter-spacing:.5px}
+  .brand small{font-weight:400; opacity:.85; font-size:12px; margin-left:6px}
+  .themes{display:flex; align-items:center; gap:6px; font-size:13px}
+  .themes span{opacity:.9}
+  .themebtn{border:1px solid rgba(255,255,255,.55); background:transparent; color:#fff; border-radius:14px;
+            padding:4px 12px; font-size:13px; cursor:pointer}
+  .themebtn.on{background:#fff; color:var(--head); font-weight:700}
+  /* 步骤指示 */
+  .steps{display:flex; gap:0; margin:18px 0 6px; border:1px solid var(--line); border-radius:10px; overflow:hidden}
+  .step{flex:1; text-align:center; padding:11px 6px; font-size:14px; background:var(--soft); color:var(--muted);
+        border-right:1px solid var(--line); display:flex; align-items:center; justify-content:center; gap:8px}
+  .step:last-child{border-right:0}
+  .step span{display:inline-flex; width:22px; height:22px; border-radius:50%; background:var(--line); color:#fff;
+             align-items:center; justify-content:center; font-size:13px; font-weight:700}
+  .step.active{background:var(--head-bg); color:var(--head); font-weight:700}
+  .step.active span{background:var(--head)}
+  .step.done span{background:var(--accent)}
+  /* 通用 */
+  h1{color:var(--head); font-size:22px; border-bottom:3px solid var(--head); padding-bottom:8px; margin-top:22px}
+  h2{color:var(--head); font-size:16px; margin-top:26px; background:var(--head-bg); padding:7px 12px; border-left:4px solid var(--head)}
+  .intro{background:var(--soft); border:1px solid var(--head-bg); border-radius:8px; padding:12px 16px; font-size:13px; margin:14px 0}
+  .stage[hidden]{display:none}
+  /* 角色徽标 */
+  .role-badge{background:var(--head-bg); border:1px solid var(--head-bg); border-left:4px solid var(--accent);
+              padding:8px 12px; border-radius:6px; font-size:13px; margin:10px 0; color:var(--text)}
+  .role-badge b{color:var(--head)}
+  /* AI 面板 */
+  .ai-panel{margin:14px 0; border:1px dashed var(--accent); border-radius:8px; padding:10px 14px; background:var(--soft); font-size:13px}
+  .ai-panel summary{cursor:pointer; font-weight:700; color:var(--head)}
+  .ai-panel .ai-hint{font-size:12px; color:var(--muted); margin-top:4px}
+  .ai-set{margin-top:10px; display:flex; flex-direction:column; gap:8px}
+  .ai-set label{display:flex; flex-direction:column; gap:3px; font-size:12.5px; color:var(--text)}
+  .ai-set input{width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px}
+  .ai-set textarea{width:100%; padding:6px 8px; border:1px solid var(--line); border-radius:6px; font-size:13px; font-family:inherit; resize:vertical}
+  .ai-go{align-self:flex-start; background:var(--accent); color:#fff; border:0; border-radius:6px; padding:9px 16px; font-size:13.5px; cursor:pointer; font-weight:700}
+  .ai-go:hover{filter:brightness(.96)}
+  #aiStatus{font-size:12.5px; color:var(--accent)}
+  /* 问卷卡片 */
+  .q{border:1px solid var(--line); border-radius:8px; padding:12px 16px; margin:12px 0; background:#fff}
+  .q .label{font-weight:700; margin-bottom:8px}
+  .q .opts label{display:block; margin:5px 0; cursor:pointer}
+  .q input[type=text]{width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:6px; font-size:14px; margin-top:2px}
+  .q textarea{width:100%; min-height:64px; padding:7px 9px; border:1px solid var(--line); border-radius:6px; font-size:14px}
+  .q select{width:100%; padding:7px 9px; border:1px solid var(--line); border-radius:6px; font-size:14px}
+  .req{color:#C00000; font-size:12px; font-weight:400}
+  .other{margin-top:8px; padding-top:8px; border-top:1px dashed var(--line); font-size:13px; color:var(--accent)}
+  .other input{width:100%; padding:6px 9px; border:1px solid var(--line); border-radius:6px; font-size:13px; margin-top:4px}
+  /* 按钮 */
+  .actions{display:flex; gap:12px; flex-wrap:wrap; margin:22px 0 8px; padding-top:14px; border-top:1px dashed var(--line)}
+  button.nav{background:var(--head); color:#fff; border:0; border-radius:6px; padding:10px 20px; font-size:15px; cursor:pointer}
+  button.nav.ghost{background:#fff; color:var(--head); border:1px solid var(--head)}
+  button.nav:hover{filter:brightness(.96)}
+  /* 只读块 */
+  .ro{background:var(--soft); border:1px solid var(--head-bg); border-radius:8px; padding:14px 18px; margin:10px 0; font-size:14px}
+  .ro ul{margin:6px 0; padding-left:20px}
+  .ro li{margin:5px 0}
+  .ro b{color:var(--head)}
+  /* ============ 计划表（稳定排版） ============ */
+  .ptable{width:100%; border-collapse:collapse; table-layout:fixed; margin:8px 0 18px;
+          font-size:13.5px; line-height:1.55; background:#fff; box-shadow:0 1px 2px rgba(0,0,0,.04)}
+  .ptable th,.ptable td{border:1px solid var(--line); padding:8px 10px; vertical-align:top;
+          word-break:break-word; overflow-wrap:anywhere}
+  .ptable thead th{background:var(--head); color:#fff; font-weight:700; text-align:left; font-size:13.5px}
+  .ptable tbody tr:nth-child(even) td{background:var(--zebra)}
+  .ptable .psep td{background:var(--head-bg); color:var(--head); font-weight:700; text-align:center; letter-spacing:.5px}
+  .ptable a{color:var(--accent); text-decoration:none; font-size:12.5px}
+  .ptable a:hover{text-decoration:underline}
+  .ptable .num{text-align:center; color:var(--muted); font-weight:700}
+  .badge{display:inline-block; padding:1px 8px; border-radius:10px; background:var(--head); color:#fff; font-size:12px; font-weight:700}
+  .ol{margin:8px 0 16px; padding-left:24px}
+  .ol li{margin:6px 0}
+  .lead{background:var(--soft); border-left:4px solid var(--head); padding:12px 16px; border-radius:0 8px 8px 0; font-size:14px; margin:12px 0}
+  .lead b{color:var(--head)}
+  #planBody.ul ol{list-style-type:disc}
+  @media print{
+    .topbar{position:static; box-shadow:none}
+    .themes{display:none}
+    .actions{display:none}
+    .ai-panel{display:none}
+    .step span{background:var(--head)!important}
+  }
+</style>
+</head>
+<body data-theme="blue">
+
+  <header class="topbar">
+    <div class="brand"><span id="brandMain">计划生成器</span> <small>选类型 → 填问卷 → 反馈 → 计划</small></div>
+    <div class="themes">
+      <span>配色：</span>
+      <button class="themebtn on" data-theme="blue">蓝</button>
+      <button class="themebtn" data-theme="green">绿</button>
+      <button class="themebtn" data-theme="orange">橙</button>
+      <button class="themebtn" data-theme="gray">灰</button>
+    </div>
+  </header>
+
+  <nav class="steps">
+    <div class="step active" data-step="1"><span>1</span>选计划类型</div>
+    <div class="step" data-step="2"><span>2</span>填需求问卷</div>
+    <div class="step" data-step="3"><span>3</span>反馈表</div>
+    <div class="step" data-step="4"><span>4</span>计划表</div>
+  </nav>
+
+  <!-- ============ 阶段1-A：第1页 · 选这是什么计划 ============ -->
+  <section id="stage1" class="stage">
+    <h1>第一步 · 这是什么计划？（先确定计划类型）</h1>
+    <div class="intro">这一页只做一件事：<b>选清楚"这是什么计划"</b>。选好之后，下一页系统会自动用最贴合的角色（考研/考证=老师，求职/考公=HR，技能/习惯/项目=教练）给你出对应的<b>专属详细需求问卷</b>；选"其他（自由描述）"就写下你的目标，系统随机应变自动生成专属题。确定后点「下一步 → 填详细需求」。</div>
+
+    <div id="qContainer1"></div>
+
+    <div class="actions">
+      <button class="nav" onclick="goTypeNext()">下一步 → 填详细需求</button>
+    </div>
+  </section>
+
+  <!-- ============ 阶段1-B：第2页 · 按所选类型出详细需求问卷 ============ -->
+  <section id="stage2" class="stage" hidden>
+    <h1>第二步 · 详细需求问卷（按你选的「<span id="page2Type">计划类型</span>」定制）</h1>
+    <div class="intro">这一页的问题是根据你上一页选的类型定制的：<b>通用基础题 + 该类型专属题</b>。单选 / 多选直接勾，填空 / 文本域按实填；每题下方都有"本题补充"框，选项里没有的自己写。想让 AI（WorkBuddy）帮你出专属题：把文件发我预填，或粘我给的 JSON 到下方「📋 免密钥导入」。填完点「生成反馈表 →」。</div>
+
+    <div class="role-badge" id="roleBadge">选好计划类型后，系统会自动用最贴合的角色（老师 / HR / 教练）来问你细节。</div>
+
+    <div id="qContainer2"></div>
+    <div id="aiDyn"></div>
+
+    <details class="ai-panel">
+      <summary>🤖 AI 替你填整套（需自己的大模型密钥 · 联网）</summary>
+      <div class="ai-hint">这是"不用自己填"的开关：点一下，AI 就按你选的计划类型 + 具体目标 + 对应角色口吻，<b>直接替你把需求问卷的答案、反馈分析、每周计划全部填好</b>（没有资料 AI 还会替你创造具体资料）。生成后你只复核、改想改的。密钥只存在你本机浏览器，不经任何第三方。支持 OpenAI / DeepSeek / Moonshot / 通义 / 智谱 等兼容 /chat/completions 的接口。</div>
+      <div class="ai-set">
+        <label>API 地址（到 /v1 那一级）：<input id="aiBase" value="https://api.openai.com/v1"></label>
+        <label>密钥（API Key）：<input id="aiKey" type="password" placeholder="sk-...（仅存本机）"></label>
+        <label>模型名：<input id="aiModel" value="gpt-4o-mini"></label>
+        <button class="ai-go" onclick="genAI()">🤖 替我把问卷答案 + 反馈 + 计划全填好</button>
+        <span id="aiStatus"></span>
+      </div>
+    </details>
+
+    <details class="ai-panel" open>
+      <summary>📋 免密钥导入（个人使用推荐 · 直接把 WorkBuddy 给你的题粘进来）</summary>
+      <div class="ai-hint">你自己用这个工具时，<b>不用填任何密钥</b>：直接跟我说"帮我出一份 XX 计划的需求问卷"，我把问题以 JSON 发你，粘到下面点「📥 导入」即可（完全离线、不发任何网络请求）。也可以把本文件发我，我直接帮你把题写进文件，你打开就预填好了。</div>
+      <div class="ai-set">
+        <label>把 WorkBuddy 发你的 JSON 粘到这里（数组格式，可只粘 <code>[ … ]</code> 一段）：
+          <textarea id="importBox" style="min-height:130px" placeholder='粘贴示例：
+[
+  {"q":"你的目标专业具体是什么？为什么选它而不是别的方向？","kind":"text","req":"填空"},
+  {"q":"你目前各科基础自评分（0-10），最弱的是哪一科？","kind":"text","req":"填空"},
+  {"q":"备考期最容易让你放弃的环节是？","kind":"area","req":"文本域"}
+]'></textarea>
+        </label>
+        <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+          <button class="ai-go" onclick="importQuestions()">📥 导入这些题（免密钥）</button>
+          <button class="ai-go" style="background:#fff;color:var(--accent);border:1px solid var(--accent)" onclick="clearAI()">清除 AI 注入</button>
+          <span id="importStatus"></span>
+        </div>
+      </div>
+    </details>
+
+    <div class="actions">
+      <button class="nav ghost" onclick="goStage(1)">← 返回上一步（改类型）</button>
+      <button class="nav" onclick="goFeedback()">生成反馈表 →</button>
+    </div>
+  </section>
+
+  <!-- ============ 阶段2：反馈表 ============ -->
+  <section id="stage3" class="stage" hidden>
+    <h1>第二步 · 反馈表（待你确认）</h1>
+    <div class="intro">用法：① 上面三段（需求摘要 / 定位分析 / 推荐方案）是<b>只读</b>，请核对"我有没有读懂你"；② 第四段"待确认栏"是你<b>可改的决策</b>，默认已按最合理勾好；③ 改完或确认无误，点「提交生成计划 →」即可出计划；想改问卷点「← 返回需求表修改」。</div>
+
+    <h2>一、需求表摘要（只读 · 自动读取你刚填的问卷）</h2>
+    <div class="ro" id="ro1"><ul></ul></div>
+
+    <h2>二、用户定位分析（只读 · 我对你情况的判断）</h2>
+    <div class="ro" id="ro2"><ul id="ro2ul"></ul></div>
+
+    <h2>三、推荐方案（只读 · 我打算怎么给你排）</h2>
+    <div class="ro" id="ro3"><ul id="ro3ul"></ul></div>
+
+    <h2>四、待确认栏（可交互 · 改完点"提交生成计划"）</h2>
+    <div id="confirmContainer"></div>
+
+    <div class="actions">
+      <button class="nav ghost" onclick="goStage(2)">← 返回填需求问卷</button>
+      <button class="nav" onclick="goPlan()">提交生成计划 →</button>
+    </div>
+  </section>
+
+  <!-- ============ 阶段3：计划表 ============ -->
+  <section id="stage4" class="stage" hidden>
+    <h1>第三步 · 你的计划表</h1>
+    <div class="lead" id="planLead"></div>
+
+    <div id="snapshotSec">
+      <h2>一、需求快照（来自你填的需求表）</h2>
+      <table class="ptable">
+        <colgroup><col style="width:26%"><col style="width:74%"></colgroup>
+        <tbody id="snapBody"></tbody>
+      </table>
+    </div>
+
+    <h2>二、计划周期总览</h2>
+    <div class="ro" id="rangeInfo"></div>
+
+    <h2>三、每周计划骨架（按你填的日期自动生成）</h2>
+    <p style="font-size:13.5px;color:var(--muted)">下表日期根据你需求表填的「开始 / 结束日期 + 执行日」自动排好。请在「本周计划」列填你的任务，「材料 / 产出」列填资源链接与量化目标；若还没填日期，先回到第一步需求表选好开始 / 结束日期。</p>
+    <table class="ptable" id="weekTable">
+      <colgroup><col style="width:8%"><col style="width:20%"><col style="width:14%"><col style="width:38%"><col style="width:20%"></colgroup>
+      <thead><tr><th>周次</th><th>日期范围</th><th>执行日</th><th>本周计划（你填）</th><th>材料 / 产出</th></tr></thead>
+      <tbody id="weekBody"></tbody>
+    </table>
+
+    <div id="carrierNote" class="intro"></div>
+
+    <div class="actions">
+      <button class="nav ghost" onclick="goStage(3)">← 返回反馈表</button>
+      <button class="nav" onclick="generateWord()">生成 Word（Word模板1）</button>
+      <button class="nav" onclick="window.print()">打印 / 存 PDF</button>
+    </div>
+  </section>
+
+<!-- ============ AI 种子区（由 WorkBuddy / 用户直接注入，打开即预填；默认留空=通用模板） ============ -->
+<!-- 格式：{ "type":"计划类型(可选，用于自动选类型)", "name":"计划名(可选)", "goal":"核心目标(可选)", "questions":[ {"q":问题,"kind":"text|single|multi|area","req":"填空/单选/多选/文本域","options":["A","B"](single/multi需要),"hint":"提示(可空)"} ] } -->
+<script type="application/json" id="planSeed">
+{
+  "type": "",
+  "name": "",
+  "goal": "",
+  "questions": []
+}
+</script>
+
+<script>
+/* ============ 数据：问卷题库（通用 + 类型专属，带角色口吻） ============ */
+/* types 字段表示该题仅在选了对应计划类型时才显示；无 types = 所有计划都显示 */
+const QUESTIONS = [
+ {id:'q_type',no:1,sec:'一、先定计划类型（决定这份计划是干什么的）',label:'这是什么计划？',type:'select',req:'下拉选',page:1,
+   options:['考研备考','考公·编制','求职·实习','技能自学','项目·副业','习惯养成','其他（自由描述）']},
+ {id:'q_name',no:2,sec:'一、先定计划类型（决定这份计划是干什么的）',label:'给这份计划起个名 / 一句话说明它干嘛的',type:'text',req:'填空',page:1,ph:'如：2026考研专业课冲刺 / 我的减脂计划 / 三个月学会做网站'},
+
+ {id:'q_goal',no:3,sec:'二、目标与定位（请你写"可验证"的目标）',label:'核心目标是什么？请用"动词 + 可验证结果"写清',type:'text',req:'填空',ph:'如：考研总分≥X 且 专业课≥Y / 拿到 N 个 offer / 做出能上线的作品 / 连续30天打卡'},
+ {id:'q_result',no:4,sec:'二、目标与定位（请你写"可验证"的目标）',label:'做完这份计划，你手里要拿到什么"硬成果"？（要能被别人验证）',type:'text',req:'填空',ph:'如：一份录取通知书 / 一份简历+3个offer / 一个GitHub项目 / 连续30天打卡截图'},
+
+ {id:'q_start',no:5,sec:'三、时间与周期',label:'计划开始日期？',type:'date',req:'选日期'},
+ {id:'q_end',no:6,sec:'三、时间与周期',label:'计划结束日期（目标达成日）？',type:'date',req:'选日期'},
+ {id:'q_weekdays',no:7,sec:'三、时间与周期',label:'具体哪几天是执行日？（用来自动排每日/每周表）',type:'multi',req:'多选',
+   options:['周一','周二','周三','周四','周五','周六','周日']},
+ {id:'q_daily',no:8,sec:'三、时间与周期',label:'每天可用时长？（执行日 vs 休息日，写具体）',type:'text',req:'填空',ph:'如：工作日晚上2h+周末全天 / 每天固定3h'},
+
+ {id:'q_base',no:9,sec:'四、基础与资源（客观自评，别美化）',label:'当前基础如何？',type:'single',req:'单选',
+   options:['从零开始','略懂一点','比较熟练','已经很强']},
+ {id:'q_resources',no:10,sec:'四、基础与资源（客观自评，别美化）',label:'已有资料 / 工具？',type:'multi',req:'多选',
+   options:['教材 / 书本','自己笔记','APP / 网站','系统网课','基本空白（啥都没有）']},
+ {id:'q_budget',no:11,sec:'四、基础与资源（客观自评，别美化）',label:'愿不愿意为它花钱？',type:'single',req:'单选',
+   options:['不花钱，纯自学','愿买资料','愿买网课','愿报班 / 请人']},
+ {id:'q_course',no:12,sec:'四、基础与资源（客观自评，别美化）',label:'课程 / 外部资源在你的计划里算什么角色？',type:'single',req:'单选',
+   options:['当主轴跟着学','仅可选补充（不占主轴）','不要外部课，纯自学']},
+ {id:'q_pain',no:13,sec:'四、基础与资源（客观自评，别美化）',label:'你过去做类似的事，最容易卡在哪一步 / 为什么总坚持不下来？',type:'area',req:'文本域',ph:'如：一开始就贪多→放弃；或卡在概念看不懂就摆烂'},
+
+ {id:'q_output',no:14,sec:'六、输出与自定义',label:'计划最终要成什么形式？',type:'single',req:'单选',
+   options:['先文字版（HTML）看','本地 Word(.doc)','飞书 docx','本地 + 飞书都要']},
+ {id:'q_link',no:15,sec:'六、输出与自定义',label:'文档里的资料 / 课程链接，显示成什么？',type:'single',req:'单选',
+   options:['完整 https 网址（平板直接点开）','描述文字即可']},
+ {id:'q_other',no:16,sec:'六、输出与自定义',label:'其他 / 我来补充',type:'area',req:'文本域'},
+
+ /* ---------- 类型专属（按 q_type 自动显隐，带角色口吻） ---------- */
+ {id:'q_ky_major',no:1,sec:'五、类型专属（考研备考 · 老师口吻）',label:'报考专业 / 方向？（具体到二级学科）',type:'text',req:'填空',ph:'如：遗传学 / 计算机专硕',types:['考研备考']},
+ {id:'q_ky_school',no:2,sec:'五、类型专属（考研备考 · 老师口吻）',label:'目标院校层次 + 具体院校？',type:'single',req:'单选',
+   options:['985','211','双非','自定目标'],types:['考研备考']},
+ {id:'q_ky_sub',no:3,sec:'五、类型专属（考研备考 · 老师口吻）',label:'考试科目有哪些？',type:'multi',req:'多选',
+   options:['政治','英语','数学','专业课一','专业课二'],types:['考研备考']},
+ {id:'q_ky_syll',no:4,sec:'五、类型专属（考研备考 · 老师口吻）',label:'考纲来源 + 核心教材（书名/作者/版本）？',type:'text',req:'填空',ph:'如：《XX》教材第X版 + 课程PPT',types:['考研备考']},
+ {id:'q_ky_base',no:5,sec:'五、类型专属（考研备考 · 老师口吻）',label:'各科目前基础自评分（0-10）？',type:'text',req:'填空',ph:'如：政治6 英语7 数学4 专业课5',types:['考研备考']},
+ {id:'q_ky_weak',no:6,sec:'五、类型专属（考研备考 · 老师口吻）',label:'最怕 / 最弱的科目是哪科？为什么？',type:'area',req:'文本域',ph:'如：数学，高中就没学好，一做题就慌',types:['考研备考']},
+ {id:'q_ky_line',no:7,sec:'五、类型专属（考研备考 · 老师口吻）',label:'目标院校近年分数线 / 报录比你了解多少？',type:'text',req:'填空',ph:'如：院线320，报录比8:1',types:['考研备考']},
+ {id:'q_ky_conflict',no:8,sec:'五、类型专属（考研备考 · 老师口吻）',label:'备考期有无上课 / 实习 / 毕业设计冲突？怎么协调？',type:'area',req:'文本域',ph:'如：大四还有3门课+实习，只能晚上和周末',types:['考研备考']},
+
+ {id:'q_gw_type',no:1,sec:'五、类型专属（考公·编制 · HR口吻）',label:'考哪条路？',type:'multi',req:'多选',
+   options:['国考','省考（联考）','选调生','事业单位','三支一扶','军队文职','其他'],types:['考公·编制']},
+ {id:'q_gw_target',no:2,sec:'五、类型专属（考公·编制 · HR口吻）',label:'目标单位 / 系统 / 岗位？你符不符合报考条件（专业/学历/应届）？',type:'text',req:'填空',ph:'如：税务岗，要求法学本科，我符合',types:['考公·编制']},
+ {id:'q_gw_xc',no:3,sec:'五、类型专属（考公·编制 · HR口吻）',label:'行测各模块自评强弱 + 目标分数？',type:'multi',req:'多选',
+   options:['言语理解','数量关系','判断推理','资料分析','常识判断'],types:['考公·编制']},
+ {id:'q_gw_sl',no:4,sec:'五、类型专属（考公·编制 · HR口吻）',label:'申论各模块强弱 + 你是否常写公文？',type:'multi',req:'多选',
+   options:['归纳概括','综合分析','对策建议','应用文写作','大作文'],types:['考公·编制']},
+ {id:'q_gw_edge',no:5,sec:'五、类型专属（考公·编制 · HR口吻）',label:'你相对其他考生的核心竞争力 / 最该补的短板是什么？',type:'area',req:'文本域',ph:'如：应届身份是优势，但申论写作太弱',types:['考公·编制']},
+ {id:'q_gw_full',no:6,sec:'五、类型专属（考公·编制 · HR口吻）',label:'能否全职备考？总可用时长？',type:'text',req:'填空',ph:'如：应届在家，每天8h',types:['考公·编制']},
+ {id:'q_gw_line',no:7,sec:'五、类型专属（考公·编制 · HR口吻）',label:'往年进面线 / 录取分你查了吗？',type:'text',req:'填空',ph:'如：进面分135，招1:3',types:['考公·编制']},
+
+ {id:'q_jb_role',no:1,sec:'五、类型专属（求职·实习 · HR口吻）',label:'目标岗位 + 行业 + 城市？',type:'text',req:'填空',ph:'如：前端开发 / 互联网 / 上海',types:['求职·实习']},
+ {id:'q_jb_ind',no:2,sec:'五、类型专属（求职·实习 · HR口吻）',label:'你目前最缺哪块（项目/实习/算法/表达/学历）？',type:'text',req:'填空',ph:'如：缺真实项目，算法也弱',types:['求职·实习']},
+ {id:'q_jb_resume',no:3,sec:'五、类型专属（求职·实习 · HR口吻）',label:'当前简历状态？',type:'single',req:'单选',
+   options:['零基础没写','有初稿','已投过几轮'],types:['求职·实习']},
+ {id:'q_jb_co',no:4,sec:'五、类型专属（求职·实习 · HR口吻）',label:'想进什么类型公司 + 你差什么硬门槛？',type:'multi',req:'多选',
+   options:['大厂','国企 / 体制内','外企','创业公司'],types:['求职·实习']},
+ {id:'q_jb_sell',no:5,sec:'五、类型专属（求职·实习 · HR口吻）',label:'你最大的卖点 / 差异化是什么？',type:'area',req:'文本域',ph:'如：做过校园公众号，10w+阅读，懂内容',types:['求职·实习']},
+ {id:'q_jb_prep',no:6,sec:'五、类型专属（求职·实习 · HR口吻）',label:'笔试 / 面试准备到哪了？',type:'text',req:'填空',ph:'如：刷了50道leetcode简单题',types:['求职·实习']},
+ {id:'q_jb_num',no:7,sec:'五、类型专属（求职·实习 · HR口吻）',label:'打算投多少家 / 时间线怎么排？',type:'text',req:'填空',ph:'如：9月投30家，先小厂练手',types:['求职·实习']},
+
+ {id:'q_sk_proj',no:1,sec:'五、类型专属（技能自学 · 教练口吻）',label:'想做出什么可演示作品？',type:'text',req:'填空',ph:'如：一个个人博客 / 一个微信小程序',types:['技能自学']},
+ {id:'q_sk_stack',no:2,sec:'五、类型专属（技能自学 · 教练口吻）',label:'技术栈 / 方向 + 当前水平？',type:'text',req:'填空',ph:'如：Python / 入门',types:['技能自学']},
+ {id:'q_sk_level',no:3,sec:'五、类型专属（技能自学 · 教练口吻）',label:'当前水平？',type:'single',req:'单选',
+   options:['零基础','入门','进阶想深入'],types:['技能自学']},
+ {id:'q_sk_stuck',no:4,sec:'五、类型专属（技能自学 · 教练口吻）',label:'你通常卡在哪一步（环境/概念/调试/坚持）？',type:'area',req:'文本域',ph:'如：环境一配就报错，直接放弃',types:['技能自学']},
+ {id:'q_sk_mile',no:5,sec:'五、类型专属（技能自学 · 教练口吻）',label:'有没有量化里程碑（如"第4周做出X"）？',type:'text',req:'填空',ph:'如：第2周跑通Hello，第4周做出来',types:['技能自学']},
+ {id:'q_sk_review',no:6,sec:'五、类型专属（技能自学 · 教练口吻）',label:'用什么方式复盘 / 检验"学会没"？',type:'text',req:'填空',ph:'如：每周做1个小项目测验',types:['技能自学']},
+
+ {id:'q_pj_ms',no:1,sec:'五、类型专属（项目·副业 · 教练口吻）',label:'关键里程碑拆成哪几步？',type:'text',req:'填空',ph:'如：需求→原型→开发→上线',types:['项目·副业']},
+ {id:'q_pj_deliver',no:2,sec:'五、类型专属（项目·副业 · 教练口吻）',label:'核心交付物是什么？',type:'text',req:'填空',ph:'如：可演示Demo / 一份报告',types:['项目·副业']},
+ {id:'q_pj_team',no:3,sec:'五、类型专属（项目·副业 · 教练口吻）',label:'协作方 / 外部依赖？',type:'text',req:'填空',ph:'如：设计同学 / 第三方API',types:['项目·副业']},
+ {id:'q_pj_owner',no:4,sec:'五、类型专属（项目·副业 · 教练口吻）',label:'你负责哪块？最大瓶颈？',type:'area',req:'文本域',ph:'如：我做后端，卡在部署',types:['项目·副业']},
+ {id:'q_pj_goal',no:5,sec:'五、类型专属（项目·副业 · 教练口吻）',label:'时间投入 + 是否要盈利 / 什么指标算成功？',type:'text',req:'填空',ph:'如：每天2h，3个月上线，100个用户',types:['项目·副业']},
+ {id:'q_pj_risk',no:6,sec:'五、类型专属（项目·副业 · 教练口吻）',label:'最大风险点是什么？怎么兜底？',type:'area',req:'文本域',ph:'如：没人用，先找10个内测',types:['项目·副业']},
+
+ {id:'q_hb_what',no:1,sec:'五、类型专属（习惯养成 · 教练口吻）',label:'要养成什么习惯 + 为什么现在养？',type:'text',req:'填空',ph:'如：每天背单词 / 准备考试',types:['习惯养成']},
+ {id:'q_hb_freq',no:2,sec:'五、类型专属（习惯养成 · 教练口吻）',label:'目标频率？',type:'single',req:'单选',
+   options:['每天','每周3次','只在工作日','自定义'],types:['习惯养成']},
+ {id:'q_hb_trigger',no:3,sec:'五、类型专属（习惯养成 · 教练口吻）',label:'触发机制：什么场景 / 时间做它？',type:'text',req:'填空',ph:'如：早饭后再刷手机前先背',types:['习惯养成']},
+ {id:'q_hb_check',no:4,sec:'五、类型专属（习惯养成 · 教练口吻）',label:'怎么打卡 / 记录？',type:'text',req:'填空',ph:'如：App打卡 / 写日记',types:['习惯养成']},
+ {id:'q_hb_block',no:5,sec:'五、类型专属（习惯养成 · 教练口吻）',label:'常见中断原因 + 应对办法？',type:'area',req:'文本域',ph:'如：熬夜就跳过→改到早上',types:['习惯养成']},
+ {id:'q_hb_reward',no:6,sec:'五、类型专属（习惯养成 · 教练口吻）',label:'怎么奖励自己 / 正反馈？',type:'text',req:'填空',ph:'如：连续7天买喜欢的东西',types:['习惯养成']},
+
+ {id:'q_ot_desc',no:1,sec:'五、类型专属（其他 · 自由描述）',label:'请描述这个计划是干什么的',type:'area',req:'文本域',types:['其他（自由描述）']}
+];
+
+/* ============ 数据：反馈表待确认栏 ============ */
+const CONFIRMS = [
+ {id:'confirm_time',no:'①',label:'启动方式 / 时间基准',type:'single',req:'单选',
+   options:[{v:'以结束日期(目标日)倒推，现在就开始排',rec:true},{v:'先只排前 2 周摸底，再往下排'},{v:'等我再想想，先出框架'}]},
+ {id:'confirm_goal',no:'②',label:'阶段目标怎么定',type:'single',req:'单选',
+   options:[{v:'先定总目标，再拆阶段小目标',rec:true},{v:'直接按"做完就行"排，不拆'},{v:'我要冲高标(超额完成)'}]},
+ {id:'confirm_course',no:'③',label:'课程 / 外部资源在你的计划里算什么角色',type:'single',req:'单选',
+   options:[{v:'当主轴（跟着系统课/资料走）',rec:true},{v:'仅可选补充，另找免费资料当主线'},{v:'不靠外部课，纯自学'}]},
+ {id:'confirm_supervise',no:'④',label:'督促方式（坚持度弱时很重要）',type:'single',req:'单选',
+   options:[{v:'每周日汇报完成度，没发我主动问',rec:true},{v:'每日打卡，断了就提醒'},{v:'先排计划，督促以后再说'}]},
+ {id:'confirm_number',no:'⑤',label:'任务编号方式',type:'single',req:'单选',
+   options:[{v:'有序 1.2.3（阶段/每日有层级）',rec:true},{v:'无序 •'},{v:'不编号'}]},
+ {id:'confirm_snapshot',no:'⑥',label:'计划开头是否加"需求快照"栏',type:'single',req:'单选',
+   options:[{v:'加（一眼回看关键需求）',rec:true},{v:'不加，直接进计划'}]},
+ {id:'confirm_color',no:'⑦',label:'配色主题',type:'single',req:'单选',
+   options:[{v:'蓝（稳重·学习）',rec:true},{v:'绿（清新·行动）'},{v:'橙（活力·推进）'},{v:'灰（极简·专业）'}]},
+ {id:'confirm_carrier',no:'⑧',label:'计划成品载体',type:'single',req:'单选',
+   options:[{v:'先文字版（你已选）',rec:true},{v:'文字版确认后转 Word(.doc)'},{v:'文字版确认后传飞书 docx'},{v:'文字版 + Word + 飞书都要'}]},
+ {id:'confirm_other',no:'⑨',label:'其他 / 我来补充',type:'area',req:'文本域'}
+];
+
+/* ============ 工具 ============ */
+function esc(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+function curType(){ return (document.querySelector('select[name="q_type"]')||{}).value||''; }
+
+/* 角色：按计划类型自动定（用户选"AI按类型自动定"） */
+function roleOf(type){
+  if(type==='考研备考'||type==='其他（自由描述）') return {role:'老师（导师）',voice:'像带研究生的导师，追问基础、考纲、薄弱模块、学术严谨度'};
+  if(type==='考公·编制'||type==='求职·实习') return {role:'HR（面试官）',voice:'像资深 HR / 面试官，追问岗位匹配、竞争力、短板、可验证产出'};
+  if(type==='技能自学'||type==='项目·副业'||type==='习惯养成') return {role:'教练（陪练）',voice:'像私教 / 陪练，追问动作拆解、量化指标、坚持机制、复盘'};
+  return {role:'老师（导师）',voice:'像导师，问得细致'};
+}
+
+/* ============ 渲染问卷（拆两页：第1页选类型 → 第2页按类型出详细题） ============ */
+function renderQuestions(){
+  const b1=document.getElementById('qContainer1');
+  const b2=document.getElementById('qContainer2');
+  const P1={html:'',cur:''}, P2={html:'',cur:''};
+  const t=curType();
+  /* section 标题的可见类型 = 该 section 下所有专属题 types 的并集；无专属题则始终可见 */
+  const secTypes={};
+  QUESTIONS.forEach(q=>{
+    if(q.sec && q.types && q.types.length){
+      if(!secTypes[q.sec]) secTypes[q.sec]=new Set();
+      q.types.forEach(x=>secTypes[q.sec].add(x));
+    }
+  });
+  function secVisible(sec){
+    const st=secTypes[sec];
+    return !st || !t || st.has(t);
+  }
+  QUESTIONS.forEach(q=>{
+    const P=(q.page===1)?P1:P2;
+    if(q.sec!==P.cur){
+      if(q.page===1 || secVisible(q.sec)){
+        const st=secTypes[q.sec];
+        const dSecTypes=st?` data-sec-types="${[...st].join(',')}"`:'';
+        P.html+=`<h2${dSecTypes}>${esc(q.sec)}</h2>`;
+      }
+      P.cur=q.sec;
+    }
+    let ctrl='';
+    if(q.type==='single'||q.type==='multi'){
+      ctrl=q.options.map(o=>`<label><input type="${q.type==='single'?'radio':'checkbox'}" name="${q.id}" value="${esc(o)}"> ${esc(o)}</label>`).join('');
+    }else if(q.type==='text'){
+      ctrl=`<input type="text" name="${q.id}" placeholder="${esc(q.ph||'')}">`;
+    }else if(q.type==='date'){
+      ctrl=`<input type="date" name="${q.id}">`;
+    }else if(q.type==='select'){
+      ctrl=`<select name="${q.id}">${q.options.map(o=>`<option value="${esc(o)}">${esc(o)}</option>`).join('')}</select>`;
+    }else if(q.type==='area'){
+      ctrl=`<textarea name="${q.id}" placeholder="${esc(q.ph||'')}"></textarea>`;
+    }
+    const dTypes=q.types?` data-types="${q.types.join(',')}"`:'';
+    P.html+=`<div class="q" data-qid="${q.id}" data-label="${esc(q.label)}"${dTypes}>
+      <div class="label">${q.no}. ${esc(q.label)} <span class="req">[${esc(q.req)}]</span></div>
+      <div class="opts">${ctrl}</div>
+      <div class="other"><span class="ot">✎ 本题补充（可留空）：</span><input type="text" name="${q.id}_other" placeholder="选项里没有的写这里…"></div>
+    </div>`;
+  });
+  if(b1) b1.innerHTML=P1.html;
+  if(b2) b2.innerHTML=P2.html;
+  // 类型切换 → 显隐专属题 + 更新标题 + 角色徽标
+  const qt=document.querySelector('select[name="q_type"]');
+  if(qt) qt.addEventListener('change',()=>{ renderOtDynamic(); applyTypeFilter(); saveState(); });
+  const qn=document.querySelector('input[name="q_name"]');
+  if(qn) qn.addEventListener('input',applyTypeFilter);
+  const qod=document.querySelector('[name="q_ot_desc"]');
+  if(qod) qod.addEventListener('input',()=>{ updateOtLabels(); saveState(); });
+}
+
+/* 按所选计划类型显隐"专属题"及对应 section 标题，并刷新标题 / 角色徽标 */
+function applyTypeFilter(){
+  const t=curType();
+  document.querySelectorAll('#qContainer2 .q[data-types]').forEach(el=>{
+    const types=el.getAttribute('data-types').split(',');
+    el.style.display = (!t || types.indexOf(t)>=0) ? '' : 'none';
+  });
+  document.querySelectorAll('#qContainer2 h2[data-sec-types]').forEach(h2=>{
+    const types=h2.getAttribute('data-sec-types').split(',');
+    h2.style.display = (!t || types.indexOf(t)>=0) ? '' : 'none';
+  });
+  const name=(document.querySelector('input[name="q_name"]')||{}).value||'';
+  let label = t ? ('计划生成器 · '+t) : '计划生成器';
+  if(name) label = '计划生成器 · '+name;
+  const bm=document.getElementById('brandMain'); if(bm) bm.textContent=label;
+  document.title = label + '（选类型→填问卷→反馈→计划）';
+  const otBox=document.getElementById('otDyn');
+  if(otBox) otBox.style.display = (t==='其他（自由描述）') ? '' : 'none';
+  const p2=document.getElementById('page2Type'); if(p2) p2.textContent = t || '计划类型';
+  // 角色徽标
+  const rb=document.getElementById('roleBadge');
+  if(rb){
+    if(t){ const r=roleOf(t); rb.innerHTML=`当前提问视角：<b>${esc(r.role)}</b> — ${esc(r.voice)}`; }
+    else rb.innerHTML='选好计划类型后，系统会自动用最贴合的角色（老师 / HR / 教练）来问你细节。';
+  }
+}
+
+/* ============ 其他类型：根据自由描述自动生成专属需求题 ============ */
+const OT_TPL=[
+ {id:'ot_d1',type:'text',req:'填空',ph:'如：2026年3月开始，12月考试',tpl:'「{g}」打算从什么时候开始、到什么时候必须达成？（填日期或阶段）'},
+ {id:'ot_d2',type:'text',req:'填空',ph:'如：本科+相关专业+2年工作经验',tpl:'「{g}」的报名 / 报考条件 / 门槛是什么？（学历、专业、年限、户籍…）'},
+ {id:'ot_d3',type:'multi',req:'多选',options:['笔试','实操 / 上机','面试','论文 / 答辩','作品 / 项目','体检 / 体测'],tpl:'「{g}」的考核 / 产出形式有哪些？'},
+ {id:'ot_d4',type:'text',req:'填空',ph:'如：官方教材+题库App+网课',tpl:'「{g}」需要准备哪些教材 / 资料 / 网课 / 题库？'},
+ {id:'ot_d5',type:'text',req:'填空',ph:'如：报名→审核→笔试→查分→领证',tpl:'「{g}」有哪些关键时间节点 / 流程？（报名、审核、考试、查分、领证…）'},
+ {id:'ot_d6',type:'text',req:'填空',ph:'如：60分合格 / 总分过线',tpl:'「{g}」的合格标准 / 分数线 / 通过线是什么？'},
+ {id:'ot_d7',type:'text',req:'填空',ph:'如：实操最弱，先补',tpl:'「{g}」你当前最薄弱、最该先补的是哪一块？'},
+ {id:'ot_d8',type:'text',req:'填空',ph:'如：历年真题+模拟考',tpl:'「{g}」平时拿什么练手 / 做真题 / 模拟？（资料或方式）'}
+];
+function ensureOtDyn(){
+  const ot=document.querySelector('.q[data-qid="q_ot_desc"]');
+  if(!ot) return null;
+  let box=document.getElementById('otDyn');
+  if(!box){ box=document.createElement('div'); box.id='otDyn'; ot.after(box); }
+  return box;
+}
+function renderOtDynamic(){
+  const type=curType();
+  const box=ensureOtDyn(); if(!box) return;
+  if(type!=='其他（自由描述）'){ box.style.display='none'; return; }
+  box.style.display='';
+  if(!box.dataset.rendered){
+    let html='<h2>专属需求（系统根据你写的计划自动生成）</h2>';
+    OT_TPL.forEach((q,i)=>{
+      let ctrl;
+      if(q.type==='multi'){ ctrl=q.options.map(o=>`<label><input type="checkbox" name="${q.id}" value="${esc(o)}"> ${esc(o)}</label>`).join(''); }
+      else { ctrl=`<input type="text" name="${q.id}" placeholder="${esc(q.ph||'')}">`; }
+      html+=`<div class="q" data-qid="${q.id}" data-label="" data-tpl="${esc(q.tpl)}" data-req="${q.req}" data-idx="${i+1}" data-types="其他（自由描述）">
+        <div class="label"></div>
+        <div class="opts">${ctrl}</div>
+        <div class="other"><span class="ot">✎ 本题补充：</span><input type="text" name="${q.id}_other" placeholder="写这里…"></div>
+      </div>`;
+    });
+    box.innerHTML=html;
+    box.dataset.rendered='1';
+  }
+  updateOtLabels();
+}
+function updateOtLabels(){
+  const goal=(document.querySelector('[name="q_ot_desc"]')||{}).value.trim()||'你的计划';
+  document.querySelectorAll('#otDyn .q[data-qid^="ot_d"]').forEach(el=>{
+    const raw=el.getAttribute('data-tpl')||'';
+    const label=raw.replace(/\{g\}/g, goal);
+    el.dataset.label=label;
+    const labEl=el.querySelector('.label');
+    if(labEl) labEl.innerHTML=`${el.dataset.idx}. ${esc(label)} <span class="req">[${el.dataset.req}]</span>`;
+  });
+}
+
+/* ============ AI 实时生成专属需求题（联网 · 用用户自己的密钥） ============ */
+let DYN=[];   // 动态题元信息：{id,q,kind,req,options,hint,answer}
+let AI_PKG=null; // AI 生成的完整计划包：{meta,questions,feedback,weekPlan}
+function dynEls(){ return [...document.querySelectorAll('#aiDyn .q[data-qid]')]; }
+
+function loadAI(){ try{ const a=JSON.parse(localStorage.getItem('plan_ai')||'{}');
+  if(a.base)document.getElementById('aiBase').value=a.base;
+  if(a.key)document.getElementById('aiKey').value=a.key;
+  if(a.model)document.getElementById('aiModel').value=a.model; }catch(e){} }
+function saveAI(){ const a={base:document.getElementById('aiBase').value,key:document.getElementById('aiKey').value,model:document.getElementById('aiModel').value};
+  try{localStorage.setItem('plan_ai',JSON.stringify(a));}catch(e){} }
+
+function parseQuestions(content){
+  content=(content||'').trim().replace(/^```(?:json)?/i,'').replace(/```$/i,'').trim();
+  let arr=null;
+  try{ arr=JSON.parse(content); }catch(e){
+    const s=content.indexOf('['); const e2=content.lastIndexOf(']');
+    if(s>=0&&e2>s){ try{ arr=JSON.parse(content.slice(s,e2+1)); }catch(_){} }
+  }
+  if(arr && !Array.isArray(arr)){ for(const k in arr){ if(Array.isArray(arr[k])){ arr=arr[k]; break; } } }
+  if(!Array.isArray(arr)) return [];
+  const K={'text':'text','single':'single','multi':'multi','area':'area'};
+  return arr.filter(x=>x&&x.q).map((x,i)=>({
+    id:'ai_'+Date.now()+'_'+i,
+    q:String(x.q), kind:K[x.kind]||'text', req:x.req||'填空',
+    options:Array.isArray(x.options)?x.options.map(String):[], hint:x.hint||''
+  }));
+}
+function renderAiDyn(){
+  const box=document.getElementById('aiDyn');
+  if(!box) return;
+  if(!DYN.length){ box.style.display='none'; box.innerHTML=''; return; }
+  box.style.display='';
+  const r=roleOf(curType());
+  let html=`<h2>🤖 AI 替你填好的需求（实时生成 · 角色：${esc(r.role)} · 可直接改）</h2>`;
+  DYN.forEach((q,i)=>{
+    const ans=(q.answer||'');
+    const ansArr=ans.split(/[；;,\n]/).map(s=>s.trim()).filter(Boolean);
+    let ctrl, otVal='';
+    if(q.kind==='single'||q.kind==='multi'){
+      const t=q.kind==='single'?'radio':'checkbox';
+      const opts=q.options&&q.options.length?q.options:['（请自填）'];
+      const inOpts = ansArr.length && ansArr.some(a=> opts.some(o=> a===o || o.indexOf(a)>=0 || a.indexOf(o)>=0));
+      ctrl=opts.map(o=>{
+        const on=ansArr.some(a=> a===o || o.indexOf(a)>=0 || a.indexOf(o)>=0) ? 'checked':'';
+        return `<label><input type="${t}" name="${q.id}" value="${esc(o)}" ${on}> ${esc(o)}</label>`;
+      }).join('');
+      if(ansArr.length && !inOpts) otVal=ans;   // 答案不在选项里 → 放进补充框
+    }else if(q.kind==='area'){
+      ctrl=`<textarea name="${q.id}" placeholder="${esc(q.hint)}">${esc(ans)}</textarea>`;
+    }else{
+      ctrl=`<input type="text" name="${q.id}" value="${esc(ans)}" placeholder="${esc(q.hint)}">`;
+    }
+    html+=`<div class="q" data-qid="${q.id}" data-label="${esc(q.q)}">
+      <div class="label">${i+1}. ${esc(q.q)} <span class="req">[${esc(q.req)}]</span></div>
+      <div class="opts">${ctrl}</div>
+      <div class="other"><span class="ot">✎ 本题补充：</span><input type="text" name="${q.id}_other" value="${esc(otVal)}" placeholder="写这里…"></div>
+    </div>`;
+  });
+  // 保留已改答案
+  const prev={};
+  box.querySelectorAll('[name]').forEach(el=>{ const k=(el.type==='radio'||el.type==='checkbox')?el.name+'#'+(el.value||''):el.name; prev[k]= (el.type==='radio'||el.type==='checkbox')?el.checked:el.value; });
+  box.innerHTML=html;
+  box.querySelectorAll('[name]').forEach(el=>{ const k=(el.type==='radio'||el.type==='checkbox')?el.name+'#'+(el.value||''):el.name; if(k in prev){ if(el.type==='radio'||el.type==='checkbox') el.checked=prev[k]; else el.value=prev[k]; } });
+}
+function genAI(){
+  const base=document.getElementById('aiBase').value.trim();
+  const key=document.getElementById('aiKey').value.trim();
+  const model=document.getElementById('aiModel').value.trim()||'gpt-4o-mini';
+  const status=document.getElementById('aiStatus');
+  if(!key){ status.textContent='⚠ 请先填密钥（API Key）'; return; }
+  const type=curType();
+  if(!type){ status.textContent='⚠ 请先在上方选好计划类型'; return; }
+  const name=(document.querySelector('input[name="q_name"]')||{}).value||'';
+  const goal=answerOf('q_goal');
+  const desc = type==='其他（自由描述）' ? answerOf('q_ot_desc') : '';
+  const r=roleOf(type);
+  const prompt=`你是一位资深的${r.role}，语气：${r.voice}。\n用户正在制定一份计划，他不想自己填问卷，请你替他把"需求问卷的答案 + 反馈分析 + 每周计划"全部填好。\n计划类型=${type}；计划名称=${name}；核心目标=${goal}；${desc?('自由描述='+desc+'；'):''}\n请直接产出一份"填好的"完整计划包，返回纯 JSON（不要任何解释、不要代码块）：\n{\n "meta":{"q_goal":"核心目标(可润色)","q_result":"可验证的成果","q_start":"YYYY-MM-DD(从今天起合理起始)","q_end":"YYYY-MM-DD(考试/截止日,请合理假设)","q_weekdays":["周一","周二","周三","周四","周五","周六"],"q_daily":"每天可投入时长,如 4小时/天","q_base":"用户当前基础(合理假设)","q_resources":"推荐资料(没有就由你创造,列出具体书名/章节)","q_budget":"预算(如 0/200元)","q_course":"主线资料角色"},\n "questions":[{"q":"需求问题","kind":"text|single|multi|area","req":"填空/单选/多选/文本域","options":["A","B"](single/multi需要),"answer":"你替用户填好的答案"}](6-8条,覆盖:基础自评/最弱项/可用资料/每天时间/时间冲突/风险点),\n "feedback":{"position":"一句话定位(用户现在在哪)","recommend":"推荐方案(怎么排,分阶段,可用换行分条)"},\n "weekPlan":[{"date":"MM/DD","what":"今天具体学什么","material":"对应材料(书名+章节/页码)","done":"做到什么程度算完成","relax":0}(每周6天学习+1天轻松,relax=1表示轻松日,覆盖约4周)]\n}\n注意：用户没有资料时由你创造具体资料(书名/章节)；每周计划要具体到天、与材料对应。`;
+  status.textContent='🤖 生成整套计划包中…';
+  fetch(base.replace(/\/$/,'')+'/chat/completions',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({model:model, messages:[{role:'user',content:prompt}], temperature:0.8})
+  }).then(resp=>{
+    if(!resp.ok) throw new Error('API 错误 '+resp.status);
+    return resp.json();
+  }).then(data=>{
+    const content=data.choices?.[0]?.message?.content||'';
+    const pkg=parsePkg(content);
+    if(!pkg){ status.textContent='⚠ 未解析到计划包（模型可能没返回 JSON）'; return; }
+    applyAiPkg(pkg);
+    saveState();
+    status.textContent='✅ 已替你填好整套：'+ (pkg.questions?.length||0) +'题 + 反馈 + '+ (pkg.weekPlan?.length||0) +'天计划（可直接改）';
+  }).catch(e=>{ status.textContent='⚠ 请求失败：'+e.message; });
+}
+
+/* 解析 AI 返回的完整计划包（容错：去代码块/找首个 { ） */
+function parsePkg(content){
+  content=(content||'').trim().replace(/^```(?:json)?/i,'').replace(/```$/i,'').trim();
+  let obj=null;
+  try{ obj=JSON.parse(content); }catch(e){
+    const s=content.indexOf('{'); const e2=content.lastIndexOf('}');
+    if(s>=0&&e2>s){ try{ obj=JSON.parse(content.slice(s,e2+1)); }catch(_){} }
+  }
+  if(obj && Array.isArray(obj)) obj={questions:obj};
+  if(!obj || typeof obj!=='object') return null;
+  if(!obj.questions && !obj.weekPlan && !obj.feedback) return null;
+  return obj;
+}
+
+/* 把 AI 计划包落到页面：预填基础字段 + 注入带答案的专属题 + 记到 AI_PKG */
+function applyAiPkg(pkg){
+  const m=pkg.meta||{};
+  const setF=(name,val)=>{
+    if(val==null||val==='') return;
+    if(Array.isArray(val)){ // weekdays 等 checkbox 组
+      val.forEach(v=>{ const c=document.querySelector(`[name="${name}"][value="${v}"]`); if(c) c.checked=true; });
+      return;
+    }
+    const el=document.querySelector(`[name="${name}"]`); if(!el) return;
+    if(el.tagName==='SELECT'){ el.value=val; }
+    else if(el.type==='radio'){ const r=document.querySelector(`[name="${name}"][value="${val}"]`); if(r) r.checked=true; }
+    else el.value=val;
+  };
+  setF('q_goal',m.q_goal); setF('q_result',m.q_result); setF('q_start',m.q_start); setF('q_end',m.q_end);
+  setF('q_weekdays',m.q_weekdays); setF('q_daily',m.q_daily); setF('q_base',m.q_base);
+  setF('q_resources',m.q_resources); setF('q_budget',m.q_budget); setF('q_course',m.q_course);
+  const K={'text':'text','single':'single','multi':'multi','area':'area'};
+  DYN=(pkg.questions||[]).filter(x=>x&&x.q).map((x,i)=>({
+    id:'ai_'+Date.now()+'_'+i, q:String(x.q), kind:K[x.kind]||'text',
+    req:x.req||'填空', options:Array.isArray(x.options)?x.options.map(String):[], hint:x.hint||'',
+    answer:x.answer!=null?String(x.answer):''
+  }));
+  AI_PKG=pkg;
+  renderAiDyn();
+  applyTypeFilter();
+  // 类型专属题随类型显隐后，把第二页标题/角色同步
+  const type=(document.querySelector('select[name="q_type"]')||{}).value||'';
+  const bm=document.getElementById('brandMain'); if(bm) bm.textContent='计划生成器 · '+(type||'未选');
+}
+
+/* ============ 免密钥导入（个人使用 · 把 WorkBuddy 给的 JSON 粘进来） ============ */
+function importQuestions(){
+  const ta=document.getElementById('importBox');
+  const status=document.getElementById('importStatus');
+  const arr=parseQuestions(ta.value);
+  if(!arr.length){ status.textContent='⚠ 没解析到题目，确认是 JSON 数组（可只粘 [ … ] 一段）'; return; }
+  DYN=arr; renderAiDyn(); saveState();
+  status.textContent='✅ 已导入 '+arr.length+' 道专属题';
+}
+/* 清除 AI 注入（DYN + 种子标记），回到纯净问卷 */
+function clearAI(){
+  DYN=[]; renderAiDyn(); saveState();
+  try{ localStorage.setItem('plan_seed_cleared','1'); }catch(e){}
+  const is=document.getElementById('importStatus'); if(is) is.textContent='已清除 AI 注入';
+  const as=document.getElementById('aiStatus'); if(as) as.textContent='';
+}
+
+/* ============ 种子区：WorkBuddy / 用户直接写进文件的题，打开即预填 ============ */
+function applySeed(){
+  if(localStorage.getItem('plan_seed_cleared')) return;   // 用户手动清过则不再自动注入
+  const se=document.getElementById('planSeed');
+  if(!se) return;
+  let data; try{ data=JSON.parse(se.textContent); }catch(e){ return; }
+  if(!data) return;
+  if(Array.isArray(data)) data={questions:data};
+  if(!data || (!data.type && !data.name && !data.goal && !(data.questions&&data.questions.length))) return;
+  if(data.type){ const sel=document.querySelector('select[name="q_type"]'); if(sel) sel.value=data.type; }
+  if(data.name){ const n=document.querySelector('input[name="q_name"]'); if(n) n.value=data.name; }
+  if(data.goal){ const g=document.querySelector('input[name="q_goal"]'); if(g) g.value=data.goal; }
+  const K={'text':'text','single':'single','multi':'multi','area':'area'};
+  if(Array.isArray(data.questions) && data.questions.length){
+    DYN=data.questions.filter(x=>x&&x.q).map((x,i)=>({
+      id:'seed_'+Date.now()+'_'+i, q:String(x.q), kind:K[x.kind]||'text',
+      req:x.req||'填空', options:Array.isArray(x.options)?x.options.map(String):[], hint:x.hint||''
+    }));
+    renderAiDyn();
+  }
+}
+
+/* ============ 渲染待确认栏 ============ */
+function renderConfirms(){
+  const box=document.getElementById('confirmContainer');
+  let html='', curSec='';
+  CONFIRMS.forEach(c=>{
+    let ctrl='';
+    if(c.type==='single'){
+      ctrl=c.options.map(o=>`<label><input type="radio" name="${c.id}" value="${esc(o.v)}" ${o.rec?'checked':''}> ${esc(o.v)}${o.rec?'（推荐）':''}</label>`).join('');
+    }else if(c.type==='area'){
+      ctrl=`<textarea name="${c.id}" placeholder="写任何上面没覆盖的决策或要求……"></textarea>`;
+    }
+    html+=`<div class="q" data-qid="${c.id}" data-label="${esc(c.label)}">
+      <div class="label">${esc(c.no)} ${esc(c.label)} <span class="req">[${esc(c.req)}]</span></div>
+      <div class="opts">${ctrl}</div>
+      <div class="other"><span class="ot">✎ 本题补充（可留空）：</span><input type="text" name="${c.id}_other" placeholder="写在这里…"></div>
+    </div>`;
+  });
+  box.innerHTML=html;
+}
+
+/* ============ 读取某题答案 ============ */
+function answerOf(qid){
+  const el=document.querySelector(`.q[data-qid="${qid}"]`);
+  if(!el) return '（未填）';
+  const radios=[...el.querySelectorAll('input[type=radio]:checked')].map(x=>x.value);
+  const checks=[...el.querySelectorAll('input[type=checkbox]:checked')].map(x=>x.value);
+  const texts=[...el.querySelectorAll('input[type=text],input[type=date],select')].map(x=>x.value.trim()).filter(Boolean);
+  const areas=[...el.querySelectorAll('textarea')].map(x=>x.value.trim()).filter(Boolean);
+  let parts=[...radios,...checks,...texts,...areas];
+  const other=el.querySelector(`input[name="${qid}_other"]`);
+  if(other && other.value.trim()) parts.push(other.value.trim());
+  return parts.join('；') || '（未填）';
+}
+
+/* ============ 阶段切换 ============ */
+function goStage(n){
+  document.querySelectorAll('.stage').forEach(s=>s.hidden=true);
+  document.getElementById('stage'+n).hidden=false;
+  document.querySelectorAll('.step').forEach(st=>{
+    const sn=+st.dataset.step;
+    st.classList.toggle('active', sn===n);
+    st.classList.toggle('done', sn<n);
+  });
+  window.scrollTo({top:0,behavior:'smooth'});
+  saveState();
+}
+
+/* 第1页 → 第2页：先确认已选计划类型 */
+function goTypeNext(){
+  const t=curType();
+  if(!t){ alert('请先选好"这是什么计划"（第一题下拉框）。'); return; }
+  applyTypeFilter();
+  goStage(2);
+}
+
+function goFeedback(){
+  const curTypeV=curType();
+  const vis=QUESTIONS.filter(q=>!q.types || !curTypeV || q.types.indexOf(curTypeV)>=0);
+  let li=vis.map(q=>`<li><b>${q.no}. ${esc(q.label)}：</b>${esc(answerOf(q.id))}</li>`).join('');
+  if(curTypeV==='其他（自由描述）'){
+    document.querySelectorAll('#otDyn .q[data-qid^="ot_d"]').forEach(el=>{
+      li+=`<li><b>${esc(el.dataset.label)}：</b>${esc(answerOf(el.dataset.qid))}</li>`;
+    });
+  }
+  dynEls().forEach(el=>{ li+=`<li><b>${esc(el.dataset.label)}：</b>${esc(answerOf(el.dataset.qid))}</li>`; });
+  const ul=document.querySelector('#ro1 ul');
+  ul.innerHTML=li;
+  buildFeedback(curTypeV);
+  goStage(3);
+}
+function buildFeedback(curTypeV){
+  const A=id=>esc(answerOf(id));
+  const typeQs=QUESTIONS.filter(q=>q.types && curTypeV && q.types.indexOf(curTypeV)>=0);
+  let typeLines=typeQs.map(q=>`<li><b>${esc(q.label)}：</b>${A(q.id)}</li>`).join('');
+  if(curTypeV==='其他（自由描述）'){
+    document.querySelectorAll('#otDyn .q[data-qid^="ot_d"]').forEach(el=>{
+      typeLines+=`<li><b>${esc(el.dataset.label)}：</b>${A(el.dataset.qid)}</li>`;
+    });
+  }
+  dynEls().forEach(el=>{ typeLines+=`<li><b>${esc(el.dataset.label)}：</b>${A(el.dataset.qid)}</li>`; });
+  // AI 已替用户填好反馈 → 直接用 AI 的定位与推荐方案（仍并入已填要点）
+  if(AI_PKG && AI_PKG.feedback){
+    const fb=AI_PKG.feedback;
+    const aro2=[
+      `<li><b>🤖 AI 定位：</b>${esc(fb.position||'')}</li>`,
+      `<li><b>🤖 AI 推荐方案：</b>${esc(fb.recommend||'')}</li>`,
+      typeLines?`<li><b>已填要点：</b><ul>${typeLines}</ul></li>`:'',
+      `<li><b>资料主线：</b>${A('q_resources')}；预算：${A('q_budget')}。</li>`
+    ].filter(Boolean);
+    const recLines=(fb.recommend||'').split(/\n+/).map(s=>s.trim()).filter(Boolean);
+    const aro3=[
+      `<li><b>阶段0 · 启动：</b>明确目标与成果口径，盘点资料，定出"做完算成功"的标准。</li>`,
+      ...(recLines.length? recLines.map(l=>`<li>${esc(l)}</li>`) : [
+        `<li><b>阶段1 · 打基础：</b>按基础倒挂——最弱/从零部分给最多时间。</li>`,
+        `<li><b>阶段2 · 强化+产出：</b>做核心交付物/真题，滚动复盘。</li>`,
+        `<li><b>阶段3 · 收尾/冲刺：</b>查漏补缺、保持手感。</li>`
+      ]),
+      `<li><b>督促机制：</b>${A('confirm_supervise')}（每周打卡/汇报）。</li>`
+    ];
+    document.getElementById('ro2ul').innerHTML=aro2.join('');
+    document.getElementById('ro3ul').innerHTML=aro3.join('');
+    return;
+  }
+  const ro2=[
+    `<li><b>计划类型：</b>${A('q_type')}；名称「${A('q_name')}」；核心目标：${A('q_goal')}。</li>`,
+    `<li><b>成果预期：</b>${A('q_result')}。</li>`,
+    `<li><b>当前基础：</b>${A('q_base')}；已有资料：${A('q_resources')}；预算：${A('q_budget')}。</li>`,
+    `<li><b>时间充裕度：</b>区间 ${A('q_start')} ~ ${A('q_end')}，执行日 ${A('q_weekdays')}，每天 ${A('q_daily')} → 据此排节奏，前段打基础、后段冲成果。</li>`,
+    `<li><b>资源角色：</b>${A('q_course')} → 主轴 / 可选补充据此定。</li>`,
+    typeLines?`<li><b>类型专属要点：</b><ul>${typeLines}</ul></li>`:'',
+    `<li><b>风险：</b>① 基础「${A('q_base')}」→ 前 2 周务必完成认知 / 入门；② 坚持度靠"${A('confirm_supervise')}"兜底；③ 时间碎片化 → 计划内置每周打卡 / 汇报。</li>`
+  ].filter(Boolean);
+  document.getElementById('ro2ul').innerHTML=ro2.join('');
+  const ro3=[
+    `<li><b>阶段0 · 启动（第 1 周）：</b>明确目标与成果口径，盘点已有资料，定出"做完算成功"的标准。</li>`,
+    `<li><b>阶段1 · 打基础（约 1/3 周期）：</b>按基础倒挂——最弱 / 从零部分给最多时间，每天约 ${A('q_daily')}。</li>`,
+    `<li><b>阶段2 · 强化 + 产出（约 1/3 周期）：</b>做核心交付物 / 真题 / 作品，滚动复盘，弱项定点补。</li>`,
+    `<li><b>阶段3 · 收尾 / 冲刺（约 1/3 周期）：</b>查漏补缺、保持手感、把成果固化成可交付物。</li>`,
+    `<li><b>材料主线：</b>"${A('q_course')}"；已有资料：${A('q_resources')}；预算：${A('q_budget')}。</li>`,
+    `<li><b>督促机制：</b>根据"${A('confirm_supervise')}"安排 —— 每周打卡 / 汇报，中断主动提醒。</li>`,
+    `<li><b>链接：</b>课程 / 资料链接交付前逐个验活，显示${A('q_link')}。</li>`
+  ];
+  document.getElementById('ro3ul').innerHTML=ro3.join('');
+}
+
+function goPlan(){
+  const get=(name)=>{const el=document.querySelector(`input[name="${name}"]:checked`);return el?el.value:'';};
+  const color=get('confirm_color');
+  if(color.includes('绿')) setTheme('green');
+  else if(color.includes('橙')) setTheme('orange');
+  else if(color.includes('灰')) setTheme('gray');
+  else setTheme('blue');
+
+  const num=get('confirm_number');
+  const olEls=document.querySelectorAll('#stage3 ol.ol');
+  if(num.includes('无序')){ olEls.forEach(o=>o.style.listStyleType='disc'); }
+  else { olEls.forEach(o=>o.style.listStyleType=''); }
+
+  const snap=get('confirm_snapshot');
+  document.getElementById('snapshotSec').style.display = snap.includes('不加') ? 'none':'';
+
+  const carrier=get('confirm_carrier');
+  const note=document.getElementById('carrierNote');
+  let txt='成品载体：'+carrier+'。';
+  if(carrier.includes('Word')) txt+=' 可一键「生成 Word（Word模板1）」：A4 排版、列对齐、打卡「□」、链接全 URL。';
+  if(carrier.includes('飞书')) txt+=' 可传飞书 docx，打卡框可点。';
+  note.innerText=txt;
+
+  buildPlanLead();
+  buildSnapshot();
+  buildRange();
+  buildWeekPlan();
+
+  goStage(4);
+}
+
+/* ============ 动态构建：计划表（按需求表日期生成） ============ */
+function fmt(d){ return (d.getMonth()+1)+'/'+d.getDate(); }
+function buildPlanLead(){
+  const A=id=>esc(answerOf(id));
+  document.getElementById('planLead').innerHTML=`一句话定位：你选的计划类型是 <b>${A('q_type')}</b>，计划叫「<b>${A('q_name')}</b>」，核心目标是 <b>${A('q_goal')}</b>。当前基础 <b>${A('q_base')}</b>、每天可用 <b>${A('q_daily')}</b> → 这份计划以你填的 <b>${A('q_start')||'（未填）'} ~ ${A('q_end')||'（未填）'}</b> 为区间自动排出。先走完"启动 + 打基础 + 强化 + 收尾"四阶段，再按节奏微调。`;
+}
+function buildSnapshot(){
+  const A=id=>esc(answerOf(id));
+  const curTypeV=curType();
+  const rows=[
+    ['计划类型', A('q_type')],
+    ['计划名称', A('q_name')],
+    ['核心目标', A('q_goal')],
+    ['预期成果', A('q_result')],
+    ['起止日期', `${A('q_start')} ~ ${A('q_end')}`],
+    ['执行日 / 每天时长', `${A('q_weekdays')} / ${A('q_daily')}`],
+    ['当前基础', A('q_base')],
+    ['已有资料 / 预算', `${A('q_resources')} / ${A('q_budget')}`],
+    ['资源角色', A('q_course')],
+    ['输出形式 / 链接显示', `${A('q_output')} / ${A('q_link')}`]
+  ];
+  if(curTypeV==='其他（自由描述）'){
+    document.querySelectorAll('#otDyn .q[data-qid^="ot_d"]').forEach(el=>{ rows.push([el.dataset.label, A(el.dataset.qid)]); });
+  }
+  // 类型专属题也进需求快照（与定位分析一致）
+  QUESTIONS.filter(q=>q.types && curTypeV && q.types.indexOf(curTypeV)>=0).forEach(q=>{ rows.push([q.label, A(q.id)]); });
+  dynEls().forEach(el=>{ rows.push([el.dataset.label, A(el.dataset.qid)]); });
+  document.getElementById('snapBody').innerHTML=rows.map(r=>`<tr><td><b>${r[0]}</b></td><td>${r[1]||'（未填）'}</td></tr>`).join('');
+}
+function buildRange(){
+  const start=document.querySelector('input[name="q_start"]').value;
+  const end=document.querySelector('input[name="q_end"]').value;
+  const wk=[...document.querySelectorAll('input[name="q_weekdays"]:checked')].map(x=>x.value);
+  const el=document.getElementById('rangeInfo');
+  if(!start||!end){ el.innerHTML='<ul><li>尚未填写开始 / 结束日期——回到第一步需求表选好日期后，这里会显示总天数与周数。</li></ul>'; return; }
+  const s=new Date(start), e=new Date(end), msDay=86400000;
+  const totalDays=Math.round((e-s)/msDay)+1;
+  const weeks=Math.ceil(totalDays/7);
+  el.innerHTML=`<ul>
+    <li><b>计划区间：</b>${esc(start)} → ${esc(end)}（共 <b>${totalDays}</b> 天，约 <b>${weeks}</b> 周）</li>
+    <li><b>执行日：</b>${wk.length? wk.map(esc).join('、') : '（需求表未选，请回去勾选）'}</li>
+    <li><b>每天时长：</b>${esc(answerOf('q_daily'))}；资源角色：${esc(answerOf('q_course'))}</li>
+  </ul>`;
+}
+/* 算每周区间，页面与 Word 导出共用 */
+function computeWeeks(){
+  const start=document.querySelector('input[name="q_start"]').value;
+  const end=document.querySelector('input[name="q_end"]').value;
+  const wk=[...document.querySelectorAll('input[name="q_weekdays"]:checked')].map(x=>x.value);
+  if(!start||!end) return null;
+  const s=new Date(start), e=new Date(end), msDay=86400000;
+  if(s>e) return null;
+  const totalDays=Math.round((e-s)/msDay)+1;
+  const weeks=Math.ceil(totalDays/7);
+  const arr=[];
+  for(let w=1; w<=weeks; w++){
+    const ws=new Date(s.getTime()+(w-1)*7*msDay);
+    const we=new Date(Math.min(e.getTime(), ws.getTime()+6*msDay));
+    arr.push({w, wsText:fmt(ws), weText:fmt(we), wd:wk.join('、'), plan:'', material:''});
+  }
+  return arr;
+}
+function buildWeekPlan(){
+  const body=document.getElementById('weekBody');
+  // AI 已替用户排好每周计划 → 直接用
+  if(AI_PKG && Array.isArray(AI_PKG.weekPlan) && AI_PKG.weekPlan.length){
+    body.innerHTML=AI_PKG.weekPlan.map(d=>{
+      const relax = d.relax? ' style="background:#F3F6FB;color:#888"':'';
+      const tag = d.relax? '（轻松日）':'';
+      return `<tr${relax}>
+        <td>${esc(d.date||'')}${tag}</td>
+        <td>${esc(d.what||'')}</td>
+        <td>${esc(d.material||'')}</td>
+        <td>${esc(d.done||'')}</td>
+        <td style="text-align:center;font-weight:bold">□</td>
+      </tr>`;
+    }).join('');
+    return;
+  }
+  const weeks=computeWeeks();
+  if(!weeks){ body.innerHTML=`<tr><td colspan="5" style="text-align:center;color:var(--muted)">尚未在需求表填「开始 / 结束日期」——回到第一步填好后，这里会自动排出每周日期。</td></tr>`; return; }
+  body.innerHTML=weeks.map(wk=>`<tr><td class="num">${wk.w}</td><td>${wk.wsText} – ${wk.weText}</td><td>${wk.wd||'（未选）'}</td><td></td><td></td></tr>`).join('');
+}
+
+/* ============ 生成 Word（Word模板1 · 5列） ============ */
+function generateWord(){
+  const t=curType();
+  const name=(document.querySelector('input[name="q_name"]')||{}).value||'';
+  const title = name? name : (t+'计划');
+  const head=getComputedStyle(document.body).getPropertyValue('--head').trim()||'#1F4E79';
+  const weeks=computeWeeks();
+  const snap=document.getElementById('snapBody').innerHTML;
+  const range=document.getElementById('rangeInfo').innerHTML;
+  const lead=document.getElementById('planLead').innerText||document.getElementById('planLead').textContent||'';
+  let wrows='';
+  if(AI_PKG && Array.isArray(AI_PKG.weekPlan) && AI_PKG.weekPlan.length){
+    wrows=AI_PKG.weekPlan.map(d=>`<tr>
+        <td>${esc(d.date||'')}${d.relax?'（轻松日）':''}</td>
+        <td>${esc(d.what||'')}</td>
+        <td>${esc(d.material||'')}</td>
+        <td>${esc(d.done||'')}</td>
+        <td style="text-align:center;font-weight:bold">□</td>
+      </tr>`).join('');
+  }else if(weeks){
+    wrows=weeks.map(wk=>`<tr>
+        <td>第${wk.w}周<br>${wk.wsText} – ${wk.weText}</td>
+        <td>${wk.plan||''}</td>
+        <td>${wk.material||''}</td>
+        <td></td>
+        <td style="text-align:center;font-weight:bold">□</td>
+      </tr>`).join('');
+  }else{
+    wrows=`<tr><td colspan="5" style="text-align:center">尚未在需求表填开始 / 结束日期</td></tr>`;
+  }
+  const html=`<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${esc(title)}</title>
+  <style>
+   body{font-family:'Microsoft YaHei','微软雅黑',sans-serif;font-size:12pt;color:#222}
+   h1{color:${head};font-size:18pt;border-bottom:3px solid ${head};padding-bottom:6px}
+   h2{color:${head};font-size:14pt;background:#EEF2F8;padding:4px 8px}
+   table{border-collapse:collapse;width:100%}
+   td,th{border:1px solid #999;padding:5px 7px;vertical-align:top;font-size:11pt}
+   .h{background:${head};color:#fff;font-weight:bold}
+   .lead{background:#F5F8FC;border-left:4px solid ${head};padding:8px 12px;margin-bottom:10px}
+  </style></head><body>
+   <h1>${esc(title)}</h1>
+   <div class='lead'>${esc(lead)}</div>
+   <h2>一、需求快照</h2>
+   <table><colgroup><col width='26%'><col width='74%'></colgroup><tbody>${snap}</tbody></table>
+   <h2>二、计划周期总览</h2>
+   <div>${range}</div>
+   <h2>三、每周计划（Word模板1 · 5列：日期 / 今天做什么 / 对应材料 / 做到这数算完成 / 打卡）</h2>
+   <table>
+     <thead><tr class='h'><th>日期</th><th>今天做什么</th><th>对应材料</th><th>做到这数算完成</th><th>打卡</th></tr></thead>
+     <tbody>${wrows}</tbody>
+   </table>
+   <p style='font-size:9pt;color:#888'>本计划由「计划生成器」一键导出 · 使用 Word模板1 排版</p>
+  </body></html>`;
+  const blob=new Blob([html],{type:'application/msword'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(title.replace(/[\\/:*?"<>|]/g,'_')+'.doc');
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+}
+
+/* ============ 配色切换 ============ */
+function setTheme(k){
+  document.body.dataset.theme=k;
+  document.querySelectorAll('.themebtn').forEach(b=>b.classList.toggle('on', b.dataset.theme===k));
+  saveState();
+}
+
+/* ============ 状态保持（防刷新丢失） ============ */
+function saveState(){
+  const s={};
+  document.querySelectorAll('input[name],textarea[name],select[name]').forEach(el=>{
+    const key=el.name+(el.type==='radio'||el.type==='checkbox'?'#'+el.value:'');
+    if(el.type==='radio'||el.type==='checkbox') s[key]=el.checked;
+    else s[el.name]=el.value;
+  });
+  s.__theme=document.body.dataset.theme;
+  s.__dyn=DYN;
+  s.__pkg=AI_PKG;
+  try{localStorage.setItem('plan_state', JSON.stringify(s));}catch(e){}
+}
+function loadState(){
+  let s; try{s=JSON.parse(localStorage.getItem('plan_state'));}catch(e){return;}
+  if(!s) return;
+  if(s.__theme) setTheme(s.__theme);
+  document.querySelectorAll('input[name],textarea[name],select[name]').forEach(el=>{
+    const key=el.name+(el.type==='radio'||el.type==='checkbox'?'#'+el.value:'');
+    if(el.type==='radio'||el.type==='checkbox'){ if(key in s) el.checked=s[key]; }
+    else if(el.name in s) el.value=s[key];
+  });
+  if(Array.isArray(s.__dyn)){ DYN=s.__dyn; renderAiDyn(); }
+  if(s.__pkg) AI_PKG=s.__pkg;
+}
+
+/* ============ 初始化 ============ */
+document.querySelectorAll('.themebtn').forEach(b=>b.addEventListener('click',()=>setTheme(b.dataset.theme)));
+document.addEventListener('input',saveState);
+document.addEventListener('change',saveState);
+['aiBase','aiKey','aiModel'].forEach(id=>{ const el=document.getElementById(id); if(el) el.addEventListener('input',saveAI); });
+renderQuestions();
+renderConfirms();
+loadAI();
+loadState();
+applySeed();          // AI 种子区：WorkBuddy/用户直接注入的题，打开即预填（覆盖本地缓存）
+renderOtDynamic();
+applyTypeFilter();
+</script>
+</body>
+</html>
